@@ -1,14 +1,23 @@
+# ---------------------------------------------------------
+# Tensorflow Iri-GAN Implementation
+# Licensed under The MIT License [see LICENSE for details]
+# Written by Cheng-Bin Jin
+# Email: sbkim0407@gmail.com
+# ---------------------------------------------------------
 import os
 import sys
 import cv2
 
-class Dataset(object):
-    def __init__(self, name=None, info=True):
-        self.name = name
-        self.dataset_path = '../../Data/CASIA-IRisV4/{}'.format(self.name)
+class CASIA_Iris(object):
+    def __init__(self, data_path, info=True):
+        self.name = data_path.split('/')[-1]
+        self.dataset_path = data_path
         self.file_names = []
 
-        for root, _, files in os.walk(self.dataset_path):
+        for idx, (root, ids, files) in enumerate(os.walk(self.dataset_path)):
+            if idx == 0:
+                self.num_persons = len(ids)
+
             for filename in files:
                 ext = os.path.splitext(filename)[-1]
                 if ext == '.jpg':
@@ -23,13 +32,16 @@ class Dataset(object):
 
     def print_info(self):
         print('Dataset: {}'.format(self.name))
+        print('Num of persons: {}'.format(self.num_persons))
         print('Num of images: {}'.format(self.num_imgs))
         print('Img shape: {}'.format(self.img_shape))
 
 
 if __name__ == '__main__':
-    names = ['CASIA-Iris-Interval', 'CASIA-Iris-Twins', 'CASIA-Iris-Lamp']
-    dataset = Dataset(name=names[2], info=True)
+    names = ['CASIA-Iris-Distance', 'CASIA-Iris-Interval', 'CASIA-Iris-Lamp',
+             'CASIA-Iris-Syn', 'CASIA-Iris-Thousand', 'CASIA-Iris-Twins']
+    path = '../../Data/CASIA-IRisV4/'
+    dataset = CASIA_Iris(data_path=os.path.join(path, names[4]), info=True)
 
     for img_name in dataset.file_names:
         img = cv2.imread(img_name, cv2.IMREAD_GRAYSCALE)
