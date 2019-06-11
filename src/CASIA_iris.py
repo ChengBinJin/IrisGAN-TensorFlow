@@ -5,7 +5,7 @@
 # Email: sbkim0407@gmail.com
 # ---------------------------------------------------------
 import os
-import sys
+# import sys
 import cv2
 import numpy as np
 
@@ -61,23 +61,23 @@ if __name__ == '__main__':
         os.makedirs(save_fold)
 
 
-    for idx in range(len(names)):
-        dataset = CASIA_Iris(data_path=os.path.join(path, names[idx]), info=True)
-        imgs = dataset.random_batch(num_imgs=16)
+    for idx_ in range(len(names)):
+        dataset = CASIA_Iris(data_path=os.path.join(path, names[idx_]), info=True)
+        imgs_ = dataset.random_batch(num_imgs=16)
 
-        height, width = imgs[0].shape
+        height_, width_ = imgs_[0].shape
         margin = 5
-        canvas = np.zeros((4*height+5*margin, 4*width+5*margin), dtype=np.uint8)
+        canvas = np.zeros((4*height_+5*margin, 4*width_+5*margin), dtype=np.uint8)
 
-        for i, img in enumerate(imgs):
-            n_row, n_col = i // 4, i % 4
+        for i_, img_ in enumerate(imgs_):
+            n_row, n_col = i_ // 4, i_ % 4
 
             # Calculate start and end positions
-            h_start = n_row * height + (n_row + 1) * margin
-            h_end = (n_row + 1) * height + (n_row + 1) * margin
-            w_start = n_col * width + (n_col + 1) * margin
-            w_end = (n_col + 1) * width + (n_col + 1) * margin
-            canvas[h_start:h_end, w_start:w_end] = imgs[i]
+            h_start = n_row * height_ + (n_row + 1) * margin
+            h_end = (n_row + 1) * height_ + (n_row + 1) * margin
+            w_start = n_col * width_ + (n_col + 1) * margin
+            w_end = (n_col + 1) * width_ + (n_col + 1) * margin
+            canvas[h_start:h_end, w_start:w_end] = img_
 
             # Save images
-            cv2.imwrite(os.path.join(save_fold, names[idx] + '.png'), canvas)
+            cv2.imwrite(os.path.join(save_fold, names[idx_] + '.png'), canvas)
