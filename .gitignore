@@ -1,3 +1,7 @@
 github_imgs/
 src/.idea
 src/__pycache__
+src/log
+src/sample
+src/model
+src/test
