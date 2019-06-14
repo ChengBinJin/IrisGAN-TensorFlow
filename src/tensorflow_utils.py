@@ -108,9 +108,9 @@ def linear(x, output_size, bias_start=0.0, stddev=0.02, initializer=None, name='
     with tf.variable_scope(name):
         if initializer is None:
             init_op = tf.truncated_normal_initializer(stddev=stddev)
-        elif initializer == 'He':
+        elif initializer.lower() == 'he':
             init_op = tf.initializers.he_normal()
-        elif initializer == 'Xavier':
+        elif initializer.lower() == 'xavier':
             init_op = tf.contrib.layers.xavier_initializer()
         else:
             raise NotImplementedError

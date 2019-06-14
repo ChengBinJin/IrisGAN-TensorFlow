@@ -32,10 +32,7 @@ def make_folders(is_train=True, cur_time=None):
     return model_dir, log_dir, sample_dir, test_dir
 
 
-def init_logger(log_dir, name, is_train):
-    logger = logging.getLogger(__name__)  # logger
-    logger.setLevel(logging.INFO)
-
+def init_logger(logger, log_dir, name, is_train):
     file_handler, stream_handler = None, None
     if is_train:
         formatter = logging.Formatter('%(asctime)s:%(name)s:%(message)s')

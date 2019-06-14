@@ -6,28 +6,29 @@
 # ---------------------------------------------------------
 import os
 import sys
+import logging
 
 import utils as utils
 
 class CASIAIrisThousand(object):
-    def __init__(self, name, is_train, log_dir):
+    def __init__(self, name='Data', is_train=True, resize_factor=0.25, log_dir=None):
         self.name = name
         self.num_persons = 1000
         self.num_images = 20000
-        self.image_shape = (480, 640, 1)
+        self.image_shape = (int(480 * resize_factor), int(640 * resize_factor), 1)
 
         # Tfrecord path
-        self.data_path = '../../Data/CASIA-IrisV4/CASIA-Iris-Thousand.tfrecords'
+        self.data_path = '../../Data/CASIA-IRisV4/CASIA-Iris-Thousand.tfrecords'
 
         if is_train:
-            self.logger, self.file_handler, self.stream_handler = utils.init_logger(log_dir=log_dir,
-                                                                                    is_train=is_train,
-                                                                                    name='dataset')
+            self.logger = logging.getLogger(__name__)  # logger
+            self.logger.setLevel(logging.INFO)
+            utils.init_logger(logger=self.logger, log_dir=log_dir, is_train=is_train, name='dataset')
 
-            self.logger.info('Name: {}'.format(self.name))
-            self.logger.info('Number of persons: {}'.format(self.num_persons))
-            self.logger.info('Number of images: {}'.format(self.num_images))
-            self.logger.info('Image shape: {}'.format(self.image_shape))
+            self.logger.info('Name: \t\t\t{}'.format(self.name))
+            self.logger.info('Number of persons: \t{}'.format(self.num_persons))
+            self.logger.info('Number of images: \t{}'.format(self.num_images))
+            self.logger.info('Image shape: \t\t{}'.format(self.image_shape))
 
     def __call__(self):
         if not os.path.isfile(self.data_path):
@@ -35,8 +36,8 @@ class CASIAIrisThousand(object):
         return self.data_path
 
 
-def Dataset(name, is_train, log_dir):
+def Dataset(name, is_train, resized_factor, log_dir):
     if name == 'CASIA-Iris-Thousand':
-        return CASIAIrisThousand(name, is_train, log_dir)
+        return CASIAIrisThousand(name=name, is_train=is_train, resize_factor=resized_factor, log_dir=log_dir)
     else:
         raise NotImplementedError

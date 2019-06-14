@@ -23,7 +23,7 @@ def data_writer(input_dir, output_name):
     num_imgs = len(file_paths)
 
     # Create tfrecrods dir if not exists
-    output_file = '{}.tfrecrods'.format(output_name)
+    output_file = '{}.tfrecords'.format(output_name)
     if not os.path.isdir(os.path.dirname(output_file)):
         os.makedirs(os.path.dirname(output_file))
 
