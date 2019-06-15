@@ -15,6 +15,8 @@ from datetime import datetime
 import utils as utils
 from dataset import Dataset
 from model import DCGAN
+from solver import Solver
+
 
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
@@ -49,6 +51,9 @@ def main(_):
     utils.init_logger(logger=logger, log_dir=log_dir, is_train=FLAGS.is_train, name='main')
     utils.print_main_parameters(logger, flags=FLAGS, is_train=FLAGS.is_train)
 
+    # Initialize session
+    sess = tf.Session()
+
     # Initialize dataset
     data = Dataset(name=FLAGS.dataset, is_train=FLAGS.is_train, resized_factor=0.25, log_dir=log_dir)
 
@@ -63,8 +68,12 @@ def main(_):
                   is_train=FLAGS.is_train,
                   log_dir=log_dir)
 
-    # Initialize session
-    sess = tf.Session()
+    # Intialize solver
+    solver = Solver(sess=sess,
+                    model=model,
+                    dataset_name=data.name,
+                    log_dir=log_dir)
+
     sess.run(tf.global_variables_initializer())
     iter_time = 0
 
@@ -74,24 +83,36 @@ def main(_):
 
     try:
         while iter_time < 10:
-            imgs = sess.run(model.real_imgs)
-            # g_loss, d_loss = sess.run([model.gen_loss, model.dis_loss], feed_dict={model.mode_tfph: True})
+            if iter_time == 0:
+                solver.saveAugment()
 
-            # print('g_loss: {0:>6.3}, d_loss: {1:>6.3}'.format(g_loss, d_loss))
-
-            print('imgs shape: {}'.format(imgs.shape))
-
-            for i in range(imgs.shape[0]):
-                cv2.imshow('Image', imgs[i].astype(np.uint8))
-                if cv2.waitKey(0) & 0xFF == 27:
-                    sys.exit(' [!] Esc clicked!')
+            # img_ori, img_trans, img_flip, img_rotate = sess.run(
+            #     [model.img_ori, model.img_trans, model.img_flip, model.img_rotate])
+            #
+            # # g_loss, d_loss = sess.run([model.gen_loss, model.dis_loss], feed_dict={model.mode_tfph: True})
+            #
+            # # print('g_loss: {0:>6.3}, d_loss: {1:>6.3}'.format(g_loss, d_loss))
+            #
+            # print('imgs shape: {}'.format(img_ori.shape))
+            # num_img, h, w, c = img_ori.shape
+            #
+            # canvas = np.zeros((num_img * h, num_img * w), dtype=np.uint8)
+            # for i in range(num_img):
+            #     canvas[i*h:(i+1)*h, 0:w] = img_ori[i, :, :, 0].astype(np.uint8)
+            #     canvas[i*h:(i+1)*h, w:2*w] = img_trans[i, :, :, 0].astype(np.uint8)
+            #     canvas[i*h:(i+1)*h, 2*w:3*w] = img_flip[i, :, :, 0].astype(np.uint8)
+            #     canvas[i*h:(i+1)*h, 3*w:4*w] = img_rotate[i, :, :, 0].astype(np.uint8)
+            #
+            # cv2.imshow('Image', canvas)
+            # if cv2.waitKey(0) & 0xFF == 27:
+            #     sys.exit(' [!] Esc clicked!')
 
             iter_time += 1
 
     except KeyboardInterrupt:
         coord.request_stop()
     except Exception as e:
-        coord.request_stope(e)
+        coord.request_stop(e)
     finally:
         # When donw, ask the threads to stop
         coord.request_stop()

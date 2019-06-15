@@ -63,7 +63,8 @@ class DCGAN(object):
                         is_train=self.is_train)
 
         # Data reader
-        self.real_imgs, img_names = reader.feed()
+        self.img_ori, self.img_trans, self.img_flip, self.img_rotate, self.img_names = reader.feed()
+        self.real_imgs = tf.identity(input=self.img_rotate)
 
         # Generator and discriminator loss
         self.g_samples = self.gen(x=self.RandomVector(), is_train=self.mode_tfph)
