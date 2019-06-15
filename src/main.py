@@ -22,7 +22,8 @@ tf.flags.DEFINE_string('dataset', 'CASIA-Iris-Thousand', 'dataset name, default:
 tf.flags.DEFINE_integer('batch_size', 4, 'batch size for one iteration, default: 80')
 tf.flags.DEFINE_integer('z_dim', 100, 'dimension of the random vector, default: 100')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
-tf.flags.DEFINE_float('learning_rate', 1e-4, 'initial learning rate for optimizer, default: 0.0001')
+tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for optimizer, default: 0.0002')
+tf.flags.DEFINE_float('beta1', 0.5, 'momentum term of Adam, default: 0.5')
 tf.flags.DEFINE_float('epoch', 120, 'number of epochs for training, default: 120')
 tf.flags.DEFINE_float('print_freq', 100, 'print frequence for loss information, default: 50')
 tf.flags.DEFINE_integer('sample_batch', 16, 'sample batch size, default: 16')
@@ -57,6 +58,7 @@ def main(_):
                   batch_size=FLAGS.batch_size,
                   z_dim=FLAGS.z_dim,
                   lr=FLAGS.learning_rate,
+                  beta1=FLAGS.beta1,
                   total_iters=round(data.num_images * FLAGS.epoch / FLAGS.batch_size),
                   is_train=FLAGS.is_train,
                   log_dir=log_dir)
@@ -73,16 +75,16 @@ def main(_):
     try:
         while iter_time < 10:
             imgs = sess.run(model.real_imgs)
-            g_loss, d_loss = sess.run([model.gen_loss, model.dis_loss], feed_dict={model.mode_tfph: True})
+            # g_loss, d_loss = sess.run([model.gen_loss, model.dis_loss], feed_dict={model.mode_tfph: True})
 
-            print('g_loss: {0:>6.3}, d_loss: {1:>6.3}'.format(g_loss, d_loss))
+            # print('g_loss: {0:>6.3}, d_loss: {1:>6.3}'.format(g_loss, d_loss))
 
-            # print('imgs shape: {}'.format(imgs.shape))
-            #
-            # for i in range(imgs.shape[0]):
-            #     cv2.imshow('Image', imgs[i].astype(np.uint8))
-            #     if cv2.waitKey(0) & 0xFF == 27:
-            #         sys.exit(' [!] Esc clicked!')
+            print('imgs shape: {}'.format(imgs.shape))
+
+            for i in range(imgs.shape[0]):
+                cv2.imshow('Image', imgs[i].astype(np.uint8))
+                if cv2.waitKey(0) & 0xFF == 27:
+                    sys.exit(' [!] Esc clicked!')
 
             iter_time += 1
 

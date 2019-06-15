@@ -4,6 +4,7 @@
 # Written by Cheng-Bin Jin
 # Email: sbkim0407@gmail.com
 # ---------------------------------------------------------
+import time
 import tensorflow as tf
 
 class Reader(object):
@@ -20,7 +21,7 @@ class Reader(object):
         self.name = name
 
         # For data augmentations
-        # self.resize_factor = 1.05
+        self.resize_factor = 1.05
         # self.rotatat_angle = 5.
 
     def feed(self):
@@ -35,7 +36,7 @@ class Reader(object):
             image_buffer = features['image/encoded_image']
             image_name_buffer = features['image/file_name']
             image = tf.image.decode_jpeg(image_buffer, channels=self.image_shape[2])
-            image = self.preprocess(image)
+            image = self.preprocess(image, is_train=self.is_train)
 
             image_batch, name_batch = tf.train.shuffle_batch([image, image_name_buffer],
                                                              batch_size=self.batch_size,
@@ -45,8 +46,29 @@ class Reader(object):
 
         return image_batch, name_batch
 
-    def preprocess(self, image):
+    def preprocess(self, image, is_train=True):
         # Resize to 2D
-        img = tf.image.resize_images(image, size=(self.image_shape[0], self.image_shape[1]))
+        img_ori = tf.image.resize_images(image, size=(self.image_shape[0], self.image_shape[1]))
+
+        # Data augmentation
+        if is_train:
+            # Random translation
+            # Step 1: Resized to the bigger image
+            img = tf.image.resize_images(images=img_ori,
+                                         size=(int(self.resize_factor * self.image_shape[0]),
+                                               int(self.resize_factor * self.image_shape[1])),
+                                         method=tf.image.ResizeMethod.BICUBIC)
+            # Step 2: Random crop
+            img = tf.image.random_crop(value=img, size=self.image_shape)
+
+            # Random left-right flip
+            img = tf.image.random_flip_left_right(image=img)
+
+            # Random rotation
+
+            # Clips tensors to a specified min and max
+            img = tf.clip_by_value(t=img, clip_value_min=0., clip_value_max=255.)
+        else:
+            img = img_ori
 
         return img

@@ -56,7 +56,7 @@ if __name__ == '__main__':
              'CASIA-Iris-Syn', 'CASIA-Iris-Thousand', 'CASIA-Iris-Twins']
     path = '../../Data/CASIA-IRisV4/'
 
-    save_fold = os.path.join('log', 'imgs')
+    save_fold = os.path.join('debug_imgs')
     if not os.path.isdir(save_fold):
         os.makedirs(save_fold)
 

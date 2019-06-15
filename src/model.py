@@ -12,8 +12,8 @@ import utils as utils
 from reader import Reader
 
 class DCGAN(object):
-    def __init__(self, image_shape, data_path, batch_size=64, z_dim=100, lr=2e-4, total_iters=2e5, is_train=True,
-                 log_dir=None, name='dcgan'):
+    def __init__(self, image_shape, data_path, batch_size=64, z_dim=100, lr=2e-4, beta1=0.999, total_iters=2e5,
+                 is_train=True, log_dir=None, name='dcgan'):
         self.image_shape = image_shape
         self.data_path = data_path
         self.batch_size = batch_size
@@ -21,6 +21,7 @@ class DCGAN(object):
         self.gen_dims = [1024, 512, 256, 128, 64, 1]
         self.dis_dims = [64, 128, 256, 512, 1024, 1]
         self.lr = lr
+        self.beta1 = beta1
         self.total_steps = total_iters
         self.start_decay_step = int(self.total_steps * 0.5)
         self.decay_steps = self.total_steps - self.start_decay_step
@@ -28,13 +29,14 @@ class DCGAN(object):
         self.log_dir = log_dir
         self.name = name
 
+        self.g_lr_tb, self.d_lr_tb = None, None
+
         self.logger = logging.getLogger(__name__)  # logger
         self.logger.setLevel(logging.INFO)
         utils.init_logger(logger=self.logger, log_dir=self.log_dir, is_train=self.is_train, name=self.name)
         self.gen_ops, self.dis_ops = [], []
 
-        with tf.variable_scope(self.name):
-            self._build_net()
+        self._build_net()
 
         # self._tensorboard()
         tf_utils.show_all_variables(logger=self.logger if self.is_train else None)
@@ -59,11 +61,44 @@ class DCGAN(object):
                         image_shape=self.image_shape,
                         batch_size=self.batch_size,
                         is_train=self.is_train)
+
+        # Data reader
         self.real_imgs, img_names = reader.feed()
 
+        # Generator and discriminator loss
         self.g_samples = self.gen(x=self.RandomVector(), is_train=self.mode_tfph)
         self.gen_loss = self.GeneratorLoss(dis_obj=self.dis, fake_img=self.g_samples)
         self.dis_loss = self.DiscriminatorLoss(dis_obj=self.dis, real_img=self.real_imgs, fake_img=self.g_samples)
+
+        # Optimizers
+        gen_op = self.Optimizer(loss=self.gen_loss, var_list=self.gen.variables, name='Gen_Adam')
+        gen_ops = [gen_op] + self.gen_ops
+        self.gen_optim = tf.group(*gen_ops)
+
+        dis_op = self.Optimizer(loss=self.dis_loss, var_list=self.dis.variables, name='Dis_Adam')
+        dis_ops = [dis_op] + self.dis_ops
+        self.dis_optim = tf.group(*dis_ops)
+
+    def Optimizer(self, loss, var_list, name='Adam'):
+        with tf.variable_scope(name):
+            global_step = tf.Variable(0, dtype=tf.float32, trainable=False)
+            start_learning_rate = self.lr
+            end_leanring_rate = 0.
+            start_decay_step = self.start_decay_step
+            decay_steps = self.decay_steps
+
+            learning_rate = tf.where(condition=tf.math.greater_equal(x=global_step, y=start_decay_step),
+                                     x=tf.train.polynomial_decay(learning_rate=start_learning_rate,
+                                                                 global_step=(global_step - start_decay_step),
+                                                                 decay_steps=decay_steps,
+                                                                 end_learning_rate=end_leanring_rate,
+                                                                 power=1.0),
+                                     y=start_learning_rate)
+
+            learn_step = tf.train.AdamOptimizer(learning_rate, beta1=self.beta1).minimize(loss, var_list=var_list)
+            self.g_lr_tb = tf.summary.scalar('g_learning_rate', learning_rate)
+
+        return learn_step
 
     def RandomVector(self):
         random_vector = tf.random.normal(shape=(self.batch_size, self.z_dim), name='random_vector')
