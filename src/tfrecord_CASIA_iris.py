@@ -10,12 +10,13 @@ import tensorflow as tf
 
 from CASIA_iris import CASIA_Iris
 
-FLAGS = tf.flags.FLAGS
 
+FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('input_data', '../../Data/CASIA-IRisV4/CASIA-Iris-Thousand',
                        'data input directory, default: ../../Data/CASIA-IrisV4/CASIA-Iris-Thousand')
 tf.flags.DEFINE_string('output_data', '../../Data/CASIA-IrisV4/CASIA-Iris-Thousand',
                        'data output directory, default: ../../Data/CASIA-IrisV4/CASIA-Iris-Thousand')
+
 
 def data_writer(input_dir, output_name):
     dataset = CASIA_Iris(data_path=input_dir)

@@ -7,6 +7,7 @@
 import math
 import tensorflow as tf
 
+
 class Reader(object):
     def __init__(self, tfrecords_file, image_shape=(120, 160, 1), batch_size=1, is_train=True, min_queue_examples=100,
                  num_threads=8, name='DataReader'):

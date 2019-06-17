@@ -10,6 +10,7 @@ import logging
 
 import utils as utils
 
+
 class CASIAIrisThousand(object):
     def __init__(self, name='Data', is_train=True, resize_factor=0.25, log_dir=None):
         self.name = name
