@@ -15,16 +15,55 @@ import utils as utils
 
 
 class Solver(object):
-    def __init__(self, model, dataset_name, log_dir):
+    def __init__(self, model, dataset_name, batch_size=8, z_dim=100, log_dir=None):
         self.sess = tf.Session()
         self.model = model
         self.dataset_name = dataset_name
+        self.batch_size = batch_size
+        self.z_dim = z_dim
         self.log_dir = log_dir
 
+        self.g_samples = []
+        self.epoch_time = 0
+
+        self.z_vectors = np.random.normal(loc=0.0, scale=1.0, size=(self.batch_size, self.z_dim))
         self.init_global_variables()
+
 
     def init_global_variables(self):
         self.sess.run(tf.global_variables_initializer())
+        
+    def fixedSample(self, sample_dir, is_save=True, wsize=4, hsize=3):
+        feed = {
+            self.model.z_vector_tfph: self.z_vectors,
+            self.model.is_train_mode_tfph: False
+        }
+
+        g_samples = self.sess.run(self.model.g_samples, feed_dict=feed)
+        self.epoch_time += 1
+
+        if is_save:
+            self.g_samples.append(utils.unnormalizeUint8(g_samples))
+
+            # Create figure with self.batch_size x self.epoch_time sub-plots
+            fig, axes = plt.subplots(nrows=self.batch_size, ncols=self.epoch_time,
+                                     figsize=(wsize*self.epoch_time, hsize*self.batch_size))
+            fig.subplots_adjust(hspace=0.03, wspace=0.03)
+
+            for i, ax in enumerate(axes.flat):
+                row_id, col_id = i // self.epoch_time, i % self.epoch_time
+                ax.imshow(self.g_samples[col_id][row_id], cmap='gray')
+
+                # Remove ticks from the plt
+                ax.set_xticks([])
+                ax.set_yticks([])
+
+            # Save figure
+            plt.savefig(fname=os.path.join(sample_dir, 'epoch_' + str(self.epoch_time - 1).zfill(2)) + '.png',
+                        bbox_inches='tight')
+            # Close figure
+            plt.close(fig)
+
 
     def sample(self, idx, sample_dir, is_save=True, wsize=4, hsize=3):
         feed = {

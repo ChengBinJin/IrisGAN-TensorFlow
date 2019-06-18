@@ -51,9 +51,6 @@ def main(_):
     utils.init_logger(logger=logger, log_dir=log_dir, is_train=FLAGS.is_train, name='main')
     utils.print_main_parameters(logger, flags=FLAGS, is_train=FLAGS.is_train)
 
-    # # Initialize session
-    # sess = tf.Session()
-
     # Initialize dataset
     data = Dataset(name=FLAGS.dataset, is_train=FLAGS.is_train, resized_factor=0.25, log_dir=log_dir)
 
@@ -71,6 +68,8 @@ def main(_):
     # Intialize solver
     solver = Solver(model=model,
                     dataset_name=data.name,
+                    batch_size=FLAGS.batch_size,
+                    z_dim=FLAGS.z_dim,
                     log_dir=log_dir)
 
     if FLAGS.is_train:
@@ -81,6 +80,7 @@ def main(_):
 
 def train(solver, data, sample_dir):
     iter_time = 0
+    one_epoch_iters = int(np.ceil(data.num_images / FLAGS.batch_size))
     total_iters = int(np.ceil(FLAGS.epoch * data.num_images / FLAGS.batch_size))
 
     # threads for tfrecord
@@ -98,8 +98,13 @@ def train(solver, data, sample_dir):
                 msg = "[{0:>7}/{1:>7}] d_loss: {2:>6.3}, g_loss: {3:>6.3}"
                 print(msg.format(iter_time, total_iters, d_loss, g_loss))
 
+            # Sampling random images
             if iter_time % FLAGS.sample_freq == 0:
                 solver.sample(idx=iter_time, sample_dir=sample_dir, is_save=True)
+
+            # Sampling fixed vectors
+            if iter_time % one_epoch_iters == 0:
+                solver.fixedSample(sample_dir=sample_dir, is_save=True)
 
             iter_time += 1
 

@@ -43,7 +43,7 @@ class DCGAN(object):
         tf_utils.show_all_variables(logger=self.logger if self.is_train else None)
 
     def _build_net(self):
-        # self.z_tfph = tf.placeholder(dtype=tf.float32, shape=[None, self.z_dim], name='z_tfph')
+        self.z_vector_tfph = tf.placeholder(dtype=tf.float32, shape=[None, self.z_dim], name='z_tfph')
         self.is_train_mode_tfph = tf.placeholder(dtype=tf.bool, name='mode_tfph')
 
         # Initialize generator and discriminator
