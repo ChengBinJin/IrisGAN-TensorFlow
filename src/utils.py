@@ -6,6 +6,7 @@
 # ---------------------------------------------------------
 import os
 import logging
+import numpy as np
 
 
 def make_folders(is_train=True, cur_time=None):
@@ -87,3 +88,8 @@ def print_main_parameters(logger, flags, is_train=True):
         print('-- sample_batch: \t\t{}'.format(flags.sample_batch))
         print('-- sample_freq: \t\t{}'.format(flags.sample_freq))
         print('-- load_model: \t\t{}'.format(flags.load_model))
+
+
+def unnormalizeUint8(imgs):
+    imgs = (imgs.squeeze() + 1.) * 127.5
+    return imgs.astype(np.uint8)

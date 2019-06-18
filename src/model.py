@@ -43,8 +43,8 @@ class DCGAN(object):
         tf_utils.show_all_variables(logger=self.logger if self.is_train else None)
 
     def _build_net(self):
-        self.z_tfph = tf.placeholder(dtype=tf.float32, shape=[None, self.z_dim], name='z_tfph')
-        self.mode_tfph = tf.placeholder(dtype=tf.bool, name='mode_tfph')
+        # self.z_tfph = tf.placeholder(dtype=tf.float32, shape=[None, self.z_dim], name='z_tfph')
+        self.is_train_mode_tfph = tf.placeholder(dtype=tf.bool, name='mode_tfph')
 
         # Initialize generator and discriminator
         self.gen = Generator(name='gen',
@@ -65,23 +65,23 @@ class DCGAN(object):
 
         # Data reader
         self.img_ori, self.img_trans, self.img_flip, self.img_rotate, self.img_names = reader.feed()
-        self.real_imgs = tf.identity(input=self.img_rotate)
+        self.real_imgs = tf.identity(input=self.normalize(self.img_rotate))
 
         # Generator and discriminator loss
-        self.g_samples = self.gen(x=self.RandomVector(), is_train=self.mode_tfph)
-        self.gen_loss = self.GeneratorLoss(dis_obj=self.dis, fake_img=self.g_samples)
-        self.dis_loss = self.DiscriminatorLoss(dis_obj=self.dis, real_img=self.real_imgs, fake_img=self.g_samples)
+        self.g_samples = self.gen(x=self.randomVector(), is_train=self.is_train_mode_tfph)
+        self.gen_loss = self.generatorLoss(dis_obj=self.dis, fake_img=self.g_samples)
+        self.dis_loss = self.discriminatorLoss(dis_obj=self.dis, real_img=self.real_imgs, fake_img=self.g_samples)
 
         # Optimizers
-        gen_op = self.Optimizer(loss=self.gen_loss, var_list=self.gen.variables, name='Gen_Adam')
+        gen_op = self.optimizer(loss=self.gen_loss, var_list=self.gen.variables, name='Gen_Adam')
         gen_ops = [gen_op] + self.gen_ops
         self.gen_optim = tf.group(*gen_ops)
 
-        dis_op = self.Optimizer(loss=self.dis_loss, var_list=self.dis.variables, name='Dis_Adam')
+        dis_op = self.optimizer(loss=self.dis_loss, var_list=self.dis.variables, name='Dis_Adam')
         dis_ops = [dis_op] + self.dis_ops
         self.dis_optim = tf.group(*dis_ops)
 
-    def Optimizer(self, loss, var_list, name='Adam'):
+    def optimizer(self, loss, var_list, name='Adam'):
         with tf.variable_scope(name):
             global_step = tf.Variable(0, dtype=tf.float32, trainable=False)
             start_learning_rate = self.lr
@@ -102,12 +102,12 @@ class DCGAN(object):
 
         return learn_step
 
-    def RandomVector(self):
+    def randomVector(self):
         random_vector = tf.random.normal(shape=(self.batch_size, self.z_dim), name='random_vector')
         return random_vector
 
     @staticmethod
-    def GeneratorLoss(dis_obj, fake_img):
+    def generatorLoss(dis_obj, fake_img):
         d_logit_fake = dis_obj(fake_img)
         loss = tf.math.reduce_mean(
             input_tensor=tf.nn.sigmoid_cross_entropy_with_logits(
@@ -116,7 +116,7 @@ class DCGAN(object):
         return loss
 
     @staticmethod
-    def DiscriminatorLoss(dis_obj, real_img, fake_img):
+    def discriminatorLoss(dis_obj, real_img, fake_img):
         d_logit_real = dis_obj(real_img)
         d_logit_fake = dis_obj(fake_img)
 
@@ -129,6 +129,10 @@ class DCGAN(object):
 
         loss = 0.5 * (error_real + error_fake)
         return loss
+
+    @staticmethod
+    def normalize(data):
+        return data / 127.5 - 1.0
 
 class Discriminator(object):
     def __init__(self, name, dims, norm='batch', _ops=None, logger=None):
@@ -241,8 +245,9 @@ class Generator(object):
             h4_relu = tf_utils.relu(h4_norm, name='h4_relu', logger=self.logger if is_train is True else None)
 
             # (N, 60, 80, 64) -> (N, 120, 160, 1)
-            output = tf_utils.deconv2d(h4_relu, output_dim=self.dims[5], name='output', initializer='He',
+            h5_deconv = tf_utils.deconv2d(h4_relu, output_dim=self.dims[5], name='h5_deconv', initializer='He',
                                        logger=self.logger if is_train is True else None)
+            output = tf_utils.tanh(h5_deconv, name='output', logger=self.logger if is_train is True else None)
 
             # Set reuse=True for next call
             self.reuse = True
