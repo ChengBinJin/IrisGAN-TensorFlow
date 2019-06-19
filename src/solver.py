@@ -26,9 +26,12 @@ class Solver(object):
         self.g_samples = []
         self.epoch_time = 0
 
-        self.z_vectors = np.random.normal(loc=0.0, scale=1.0, size=(self.batch_size, self.z_dim))
+        self._initRandomVector()
         self.init_global_variables()
 
+    def _initRandomVector(self, seed=1234):
+        np.random.seed(seed=seed)  # Fixed random vector
+        self.z_vectors = np.random.normal(loc=0.0, scale=1.0, size=(self.batch_size, self.z_dim))
 
     def init_global_variables(self):
         self.sess.run(tf.global_variables_initializer())
@@ -43,8 +46,11 @@ class Solver(object):
         self.epoch_time += 1
 
         if is_save:
-            self.g_samples.append(utils.unnormalizeUint8(g_samples))
+            g_samples = utils.unnormalizeUint8(g_samples)
+            self.g_samples.append(g_samples)
 
+            ##################################################################################################
+            # 1st image
             # Create figure with self.batch_size x self.epoch_time sub-plots
             fig, axes = plt.subplots(nrows=self.batch_size, ncols=self.epoch_time,
                                      figsize=(wsize*self.epoch_time, hsize*self.batch_size))
@@ -59,7 +65,27 @@ class Solver(object):
                 ax.set_yticks([])
 
             # Save figure
-            plt.savefig(fname=os.path.join(sample_dir, 'epoch_' + str(self.epoch_time - 1).zfill(2)) + '.png',
+            plt.savefig(fname=os.path.join(sample_dir, 'fixed_' + str(self.epoch_time - 1).zfill(3) + '.png'),
+                        bbox_inches='tight')
+            # Close figure
+            plt.close(fig)
+
+            ##################################################################################################
+            # 2nd image
+            # Create figure with sqrt(self.batch_size) x sqrt(self.batch_size) sub-plots
+            nrows = ncols = int(np.floor(np.sqrt(self.batch_size)))
+            fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(wsize*ncols, hsize*nrows))
+            fig.subplots_adjust(hspace=0.03, wspace=0.03)
+
+            for i, ax in enumerate(axes.flat):
+                ax.imshow(g_samples[i], cmap='gray')
+
+                # Remove ticks from the plt
+                ax.set_xticks([])
+                ax.set_yticks([])
+
+            # Save figure
+            plt.savefig(fname=os.path.join(sample_dir, 'epoch_' + str(self.epoch_time - 1).zfill(3) + 'th' + '.png'),
                         bbox_inches='tight')
             # Close figure
             plt.close(fig)

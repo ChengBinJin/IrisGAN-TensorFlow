@@ -5,9 +5,7 @@
 # Email: sbkim0407@gmail.com
 # ---------------------------------------------------------
 import os
-# import sys
 import logging
-# import cv2
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
@@ -21,7 +19,7 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'CASIA-Iris-Thousand', 'dataset name, default: CASIA-Iris-Thousand')
-tf.flags.DEFINE_integer('batch_size', 4, 'batch size for one iteration, default: 80')
+tf.flags.DEFINE_integer('batch_size', 8, 'batch size for one iteration, default: 64')
 tf.flags.DEFINE_integer('z_dim', 100, 'dimension of the random vector, default: 100')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for optimizer, default: 0.0002')
@@ -72,16 +70,23 @@ def main(_):
                     z_dim=FLAGS.z_dim,
                     log_dir=log_dir)
 
+    # Initialize saver
+    saver = tf.train.Saver(max_to_keep=1)
+
     if FLAGS.is_train:
-        train(solver, data, sample_dir, log_dir)
+        train(solver, data, saver, logger, sample_dir, model_dir, log_dir)
     else:
         test(solver)
 
 
-def train(solver, data, sample_dir, log_dir):
+def train(solver, data, saver, logger, sample_dir, model_dir, log_dir):
     iter_time = 0
     one_epoch_iters = int(np.ceil(data.num_images / FLAGS.batch_size))
     total_iters = int(np.ceil(FLAGS.epoch * data.num_images / FLAGS.batch_size))
+
+    if FLAGS.load_model is not None:
+        flag, iter_time = load_model(saver=saver, solver=solver, logger=logger, model_dir=model_dir, is_train=True)
+        logger.info(' [!] Load Success! Iter: {}'.format(iter_time))
 
     # Tensorboard writer
     tb_writer = tf.summary.FileWriter(log_dir, graph_def=solver.sess.graph_def)
@@ -110,9 +115,11 @@ def train(solver, data, sample_dir, log_dir):
             if iter_time % FLAGS.sample_freq == 0:
                 solver.sample(idx=iter_time, sample_dir=sample_dir, is_save=True)
 
-            # Sampling fixed vectors
-            if iter_time % one_epoch_iters == 0:
+            # Sampling fixed vectors for finishing one epoch
+            # if iter_time % one_epoch_iters == 0:
+            if iter_time % 500 == 0:
                 solver.fixedSample(sample_dir=sample_dir, is_save=True)
+                save_model(saver, solver, logger, model_dir, iter_time)
 
             iter_time += 1
 
@@ -129,6 +136,34 @@ def train(solver, data, sample_dir, log_dir):
 def test(solver):
     print("Hello test!")
 
+
+def save_model(saver, solver, logger, model_dir, iter_time):
+    saver.save(solver.sess, os.path.join(model_dir, 'model'), global_step=iter_time)
+    logger.info(' [*] Model saved! Iter: {}'.format(iter_time))
+
+
+def load_model(saver, solver, logger, model_dir, is_train=False):
+    if is_train:
+        logger.info(' [*] Reading checkpoint...')
+    else:
+        print(' [*] Reading checkpoint...')
+
+    ckpt = tf.train.get_checkpoint_state(model_dir)
+    if ckpt and ckpt.model_checkpoint_path:
+        ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+        saver.restore(solver.sess,os.path.join(model_dir, ckpt_name))
+
+        meta_graph_path = ckpt.model_checkpoint_path + '.meta'
+        iter_time = int(meta_graph_path.split('-')[-1].split('.')[0])
+
+        if is_train:
+            logger.info(' [!] Load Iter: {}'.format(iter_time))
+        else:
+            print(' [!] Load Iter: {}'.format(iter_time))
+
+        return True, iter_time
+    else:
+        return False, None
 
 
 if __name__ == '__main__':
