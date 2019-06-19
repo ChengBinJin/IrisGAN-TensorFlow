@@ -109,11 +109,13 @@ class Solver(object):
 
         # Run g_optim twice to make sure that d_loss does not got to zero
         g_loss = 0.
-        for i in range(2):
-            _, g_loss, g_samples = self.sess.run([self.model.gen_optim, self.model.gen_loss, self.model.g_samples],
-                                                 feed_dict=feed)
+        summary_op = None
 
-        return d_loss, g_loss
+        for i in range(2):
+            _, g_loss, summary_op = self.sess.run([self.model.gen_optim, self.model.gen_loss, self.model.summary_op],
+                                                  feed_dict=feed)
+
+        return d_loss, g_loss, summary_op
 
     def saveAugment(self, wsize=4, hsize=3):
         run_op = [self.model.img_ori, self.model.img_trans, self.model.img_flip, self.model.img_rotate]

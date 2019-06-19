@@ -61,7 +61,7 @@ def main(_):
                   z_dim=FLAGS.z_dim,
                   lr=FLAGS.learning_rate,
                   beta1=FLAGS.beta1,
-                  total_iters=round(data.num_images * FLAGS.epoch / FLAGS.batch_size),
+                  total_iters=int(np.ceil(FLAGS.epoch * data.num_images / FLAGS.batch_size)),
                   is_train=FLAGS.is_train,
                   log_dir=log_dir)
 
@@ -73,17 +73,20 @@ def main(_):
                     log_dir=log_dir)
 
     if FLAGS.is_train:
-        train(solver, data, sample_dir)
+        train(solver, data, sample_dir, log_dir)
     else:
         test(solver)
 
 
-def train(solver, data, sample_dir):
+def train(solver, data, sample_dir, log_dir):
     iter_time = 0
     one_epoch_iters = int(np.ceil(data.num_images / FLAGS.batch_size))
     total_iters = int(np.ceil(FLAGS.epoch * data.num_images / FLAGS.batch_size))
 
-    # threads for tfrecord
+    # Tensorboard writer
+    tb_writer = tf.summary.FileWriter(log_dir, graph_def=solver.sess.graph_def)
+
+    # Threads for tfrecord
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
 
@@ -93,7 +96,12 @@ def train(solver, data, sample_dir):
             if iter_time == 0:
                 solver.saveAugment()
 
-            d_loss, g_loss = solver.train()
+            d_loss, g_loss, summary = solver.train()
+
+            # Write to tensorboard
+            tb_writer.add_summary(summary, iter_time)
+            tb_writer.flush()
+
             if iter_time % FLAGS.print_freq == 0:
                 msg = "[{0:>7}/{1:>7}] d_loss: {2:>6.3}, g_loss: {3:>6.3}"
                 print(msg.format(iter_time, total_iters, d_loss, g_loss))

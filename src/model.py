@@ -38,6 +38,7 @@ class DCGAN(object):
         self.gen_ops, self.dis_ops = [], []
 
         self._build_net()
+        self._initTensorBoard()
 
         # self._tensorboard()
         tf_utils.show_all_variables(logger=self.logger if self.is_train else None)
@@ -73,34 +74,32 @@ class DCGAN(object):
         self.dis_loss = self.discriminatorLoss(dis_obj=self.dis, real_img=self.real_imgs, fake_img=self.g_samples)
 
         # Optimizers
-        gen_op = self.optimizer(loss=self.gen_loss, var_list=self.gen.variables, name='Gen_Adam')
+        self.gen_optimizer_obj = Optimizer(start_learning_rate=self.lr,
+                                           start_decay_step=self.start_decay_step,
+                                           decay_steps=self.decay_steps,
+                                           beta1=self.beta1,
+                                           name='Gen_Adam',
+                                           is_twice=True)
+        gen_op = self.gen_optimizer_obj(loss=self.gen_loss, var_list=self.gen.variables)
         gen_ops = [gen_op] + self.gen_ops
         self.gen_optim = tf.group(*gen_ops)
 
-        dis_op = self.optimizer(loss=self.dis_loss, var_list=self.dis.variables, name='Dis_Adam')
+        self.dis_optimizer_obj = Optimizer(start_learning_rate=self.lr,
+                                           start_decay_step=self.start_decay_step,
+                                           decay_steps=self.decay_steps,
+                                           beta1=self.beta1,
+                                           name='Dis_Adam',
+                                           is_twice=False)
+        dis_op = self.dis_optimizer_obj(loss=self.dis_loss, var_list=self.dis.variables)
         dis_ops = [dis_op] + self.dis_ops
         self.dis_optim = tf.group(*dis_ops)
 
-    def optimizer(self, loss, var_list, name='Adam'):
-        with tf.variable_scope(name):
-            global_step = tf.Variable(0, dtype=tf.float32, trainable=False)
-            start_learning_rate = self.lr
-            end_leanring_rate = 0.
-            start_decay_step = self.start_decay_step
-            decay_steps = self.decay_steps
-
-            learning_rate = tf.where(condition=tf.math.greater_equal(x=global_step, y=start_decay_step),
-                                     x=tf.train.polynomial_decay(learning_rate=start_learning_rate,
-                                                                 global_step=(global_step - start_decay_step),
-                                                                 decay_steps=decay_steps,
-                                                                 end_learning_rate=end_leanring_rate,
-                                                                 power=1.0),
-                                     y=start_learning_rate)
-
-            learn_step = tf.train.AdamOptimizer(learning_rate, beta1=self.beta1).minimize(loss, var_list=var_list)
-            self.g_lr_tb = tf.summary.scalar('g_learning_rate', learning_rate)
-
-        return learn_step
+    def _initTensorBoard(self):
+        dis_loss = tf.summary.scalar('Loss/dis_loss', self.dis_loss)
+        gen_loss = tf.summary.scalar('Loss/gen_loss', self.gen_loss)
+        dis_lr = tf.summary.scalar('Learning_rate/dis_lr', self.dis_optimizer_obj.learning_rate)
+        gen_lr = tf.summary.scalar('Learning_rate/gen_lr', self.gen_optimizer_obj.learning_rate)
+        self.summary_op = tf.summary.merge(inputs=[dis_loss, gen_loss, dis_lr, gen_lr])
 
     def randomVector(self):
         random_vector = tf.random.normal(shape=(self.batch_size, self.z_dim), name='random_vector')
@@ -133,6 +132,39 @@ class DCGAN(object):
     @staticmethod
     def normalize(data):
         return data / 127.5 - 1.0
+
+
+class Optimizer(object):
+    def __init__(self, start_learning_rate, start_decay_step, decay_steps, beta1=0.9, name=None, is_twice=False):
+        self.start_learning_rate = start_learning_rate
+        self.end_leanring_rate = 0.
+
+        if is_twice is True:
+            self.start_decay_step = start_decay_step * 2
+            self.decay_steps = decay_steps * 2
+        else:
+            self.start_decay_step = start_decay_step
+            self.decay_steps = decay_steps
+
+        self.beta1 = beta1
+        self.name = name
+        self.learning_rate = None
+
+    def __call__(self, loss, var_list):
+        with tf.variable_scope(self.name):
+            global_step = tf.Variable(0, dtype=tf.float32, trainable=False)
+            self.learning_rate = tf.where(condition=tf.math.greater_equal(x=global_step, y=self.start_decay_step),
+                                     x=tf.train.polynomial_decay(learning_rate=self.start_learning_rate,
+                                                                 global_step=(global_step - self.start_decay_step),
+                                                                 decay_steps=self.decay_steps,
+                                                                 end_learning_rate=self.end_leanring_rate,
+                                                                 power=1.0),
+                                     y=self.start_learning_rate)
+
+            learn_step = tf.train.AdamOptimizer(
+                self.learning_rate, beta1=self.beta1).minimize(loss, global_step=global_step, var_list=var_list)
+
+        return learn_step
 
 class Discriminator(object):
     def __init__(self, name, dims, norm='batch', _ops=None, logger=None):
