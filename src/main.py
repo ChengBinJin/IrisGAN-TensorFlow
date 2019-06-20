@@ -19,12 +19,12 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'CASIA-Iris-Thousand', 'dataset name, default: CASIA-Iris-Thousand')
-tf.flags.DEFINE_integer('batch_size', 8, 'batch size for one iteration, default: 64')
+tf.flags.DEFINE_integer('batch_size', 4, 'batch size for one iteration, default: 64')
 tf.flags.DEFINE_integer('z_dim', 100, 'dimension of the random vector, default: 100')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for optimizer, default: 0.0002')
 tf.flags.DEFINE_float('beta1', 0.5, 'momentum term of Adam, default: 0.5')
-tf.flags.DEFINE_float('epoch', 1, 'number of epochs for training, default: 120')
+tf.flags.DEFINE_float('epoch', 2, 'number of epochs for training, default: 120')
 tf.flags.DEFINE_float('print_freq', 100, 'print frequence for loss information, default: 50')
 tf.flags.DEFINE_integer('sample_batch', 16, 'sample batch size, default: 16')
 tf.flags.DEFINE_float('sample_freq', 100, 'sample frequence for checking quality of the generated images, default: 500')
@@ -91,12 +91,14 @@ def train(solver, data, saver, logger, sample_dir, model_dir, log_dir):
     # Tensorboard writer
     tb_writer = tf.summary.FileWriter(log_dir, graph_def=solver.sess.graph_def)
 
+    csvWriter = utils.CSVWriter(path=model_dir)
+
     # Threads for tfrecord
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
 
     try:
-        while iter_time < total_iters:
+        while iter_time <= total_iters:
             # Save training images just in first iteration
             if iter_time == 0:
                 solver.saveAugment()
@@ -107,21 +109,27 @@ def train(solver, data, saver, logger, sample_dir, model_dir, log_dir):
             tb_writer.add_summary(summary, iter_time)
             tb_writer.flush()
 
-            if iter_time % FLAGS.print_freq == 0:
+            if (iter_time % FLAGS.print_freq == 0) or (iter_time == total_iters):
+                # Write loss information on the csv file
+                csvWriter.update(iter_time=iter_time, d_loss=d_loss, g_loss=g_loss)
+
                 msg = "[{0:>7}/{1:>7}] d_loss: {2:>6.3}, g_loss: {3:>6.3}"
                 print(msg.format(iter_time, total_iters, d_loss, g_loss))
 
             # Sampling random images
-            if iter_time % FLAGS.sample_freq == 0:
+            if iter_time % FLAGS.sample_freq == 0 or (iter_time == total_iters):
                 solver.sample(idx=iter_time, sample_dir=sample_dir, is_save=True)
 
             # Sampling fixed vectors for finishing one epoch
-            # if iter_time % one_epoch_iters == 0:
-            if iter_time % 500 == 0:
+            # if iter_time % one_epoch_iters == 0 or (iter_time == total_iters):
+            if iter_time % 500 == 0 or (iter_time == total_iters):
                 solver.fixedSample(sample_dir=sample_dir, is_save=True)
                 save_model(saver, solver, logger, model_dir, iter_time)
 
             iter_time += 1
+
+        # Close csv file
+        csvWriter.close()
 
     except KeyboardInterrupt:
         coord.request_stop()
@@ -138,6 +146,7 @@ def test(solver):
 
 
 def save_model(saver, solver, logger, model_dir, iter_time):
+    np.save(os.path.join(model_dir, 'g_samples.npy'), np.asarray(solver.g_samples))
     saver.save(solver.sess, os.path.join(model_dir, 'model'), global_step=iter_time)
     logger.info(' [*] Model saved! Iter: {}'.format(iter_time))
 
@@ -161,7 +170,13 @@ def load_model(saver, solver, logger, model_dir, is_train=False):
         else:
             print(' [!] Load Iter: {}'.format(iter_time))
 
-        return True, iter_time
+        # Restore solver.g_samples
+        g_samples = np.load(os.path.join(model_dir, 'g_samples.npy'))
+        solver.epoch_time = g_samples.shape[0]
+        for i in range(g_samples.shape[0]):
+            solver.g_samples.append(g_samples[i])
+
+        return True, iter_time + 1
     else:
         return False, None
 

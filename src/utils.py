@@ -5,8 +5,22 @@
 # Email: sbkim0407@gmail.com
 # ---------------------------------------------------------
 import os
+import csv
 import logging
 import numpy as np
+
+
+class CSVWriter(object):
+    def __init__(self, path, name='loss.csv'):
+        # mode = 'a' append mode
+        self.file = open(os.path.join(path, name), mode='a', newline='')
+        self.writer = csv.writer(self.file, delimiter=',')
+
+    def update(self, iter_time, d_loss, g_loss):
+        self.writer.writerow([iter_time, d_loss, g_loss])
+
+    def close(self):
+        self.file.close()
 
 
 def make_folders(is_train=True, cur_time=None):
