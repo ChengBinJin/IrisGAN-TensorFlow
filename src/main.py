@@ -5,8 +5,14 @@
 # Email: sbkim0407@gmail.com
 # ---------------------------------------------------------
 import os
+import sys
+import csv
 import logging
 import numpy as np
+import matplotlib as mpl
+mpl.use('TkAgg')  # or whatever other backend that you want to solve Segmentation fault (core dumped)
+import seaborn as sns
+import matplotlib.pyplot as plt
 import tensorflow as tf
 from datetime import datetime
 
@@ -19,12 +25,12 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'CASIA-Iris-Thousand', 'dataset name, default: CASIA-Iris-Thousand')
-tf.flags.DEFINE_integer('batch_size', 4, 'batch size for one iteration, default: 64')
+tf.flags.DEFINE_integer('batch_size', 16, 'batch size for one iteration, default: 64')
 tf.flags.DEFINE_integer('z_dim', 100, 'dimension of the random vector, default: 100')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for optimizer, default: 0.0002')
 tf.flags.DEFINE_float('beta1', 0.5, 'momentum term of Adam, default: 0.5')
-tf.flags.DEFINE_float('epoch', 2, 'number of epochs for training, default: 120')
+tf.flags.DEFINE_float('epoch', 1, 'number of epochs for training, default: 120')
 tf.flags.DEFINE_float('print_freq', 100, 'print frequence for loss information, default: 50')
 tf.flags.DEFINE_integer('sample_batch', 16, 'sample batch size, default: 16')
 tf.flags.DEFINE_float('sample_freq', 100, 'sample frequence for checking quality of the generated images, default: 500')
@@ -76,7 +82,7 @@ def main(_):
     if FLAGS.is_train:
         train(solver, data, saver, logger, sample_dir, model_dir, log_dir)
     else:
-        test(solver)
+        test(solver, saver, test_dir, model_dir, log_dir)
 
 
 def train(solver, data, saver, logger, sample_dir, model_dir, log_dir):
@@ -89,7 +95,8 @@ def train(solver, data, saver, logger, sample_dir, model_dir, log_dir):
         logger.info(' [!] Load Success! Iter: {}'.format(iter_time))
 
     # Tensorboard writer
-    tb_writer = tf.summary.FileWriter(log_dir, graph_def=solver.sess.graph_def)
+    tb_writer = tf.summary.FileWriter(logdir=log_dir,
+                                      graph_def=solver.sess.graph_def)
 
     csvWriter = utils.CSVWriter(path=model_dir)
 
@@ -118,12 +125,12 @@ def train(solver, data, saver, logger, sample_dir, model_dir, log_dir):
 
             # Sampling random images
             if iter_time % FLAGS.sample_freq == 0 or (iter_time == total_iters):
-                solver.sample(idx=iter_time, sample_dir=sample_dir, is_save=True)
+                solver.sample(idx=iter_time, save_dir=sample_dir, is_save=True)
 
             # Sampling fixed vectors for finishing one epoch
             # if iter_time % one_epoch_iters == 0 or (iter_time == total_iters):
             if iter_time % 500 == 0 or (iter_time == total_iters):
-                solver.fixedSample(sample_dir=sample_dir, is_save=True)
+                solver.fixedSample(save_dir=sample_dir, is_save=True)
                 save_model(saver, solver, logger, model_dir, iter_time)
 
             iter_time += 1
@@ -140,9 +147,40 @@ def train(solver, data, saver, logger, sample_dir, model_dir, log_dir):
         coord.request_stop()
         coord.join(threads)
 
+    # Plot loss information
+    plot_loss(log_dir, model_dir)
 
-def test(solver):
-    print("Hello test!")
+
+def test(solver, saver, test_dir, model_dir, log_dir):
+    flag, iter_time = load_model(saver=saver, solver=solver, logger=None, model_dir=model_dir, is_train=False)
+    if flag is False:
+        sys.exit(" [!] Failed to load model: {}!".format(model_dir))
+
+    # Load csv file to plot loss information
+    plot_loss(log_dir, model_dir)
+    iter_time, total_iters = 0, 30
+
+    # Threads for tfrecord
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(sess=solver.sess, coord=coord)
+
+    try:
+        while iter_time <= total_iters:
+            print("Iter: {}".format(iter_time))
+            solver.test_sample(idx=iter_time, save_dir=test_dir)
+            iter_time += 1
+
+        # Close csv file
+        # csvWriter.close()
+
+    except KeyboardInterrupt:
+        coord.request_stop()
+    except Exception as e:
+        coord.request_stop(e)
+    finally:
+        # When donw, ask the threads to stop
+        coord.request_stop()
+        coord.join(threads)
 
 
 def save_model(saver, solver, logger, model_dir, iter_time):
@@ -180,6 +218,37 @@ def load_model(saver, solver, logger, model_dir, is_train=False):
     else:
         return False, None
 
+
+def plot_loss(log_dir, model_dir):
+    # read csv file
+    file_name = os.path.join(model_dir, 'loss.csv')
+
+    data = []
+    with open(file_name) as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+
+        for row in csv_reader:
+            data.append([float(row[1]), float(row[2])])  # Discriminator and Generator
+
+    # Transpose and become to array: (2, N)
+    data = np.asarray(np.transpose(data))
+
+    # Set environment
+    sns.set()  # Use seaborn library to draw plt
+    plt.rcParams['figure.figsize'] = (12.0, 8.0)  # set default size of plots
+
+    # Draw x and y ticks
+    x = np.arange(data.shape[1])
+    plt.plot(x, data[0, :], color='green', linestyle='solid')   # discriminator loss
+    plt.plot(x, data[1, :], color='blue', linestyle='solid')    # generator loss
+
+    # Add legend, label, and title
+    plt.legend(['Discriminator Loss', 'Generator Loss'], loc='upper right')
+    plt.title('Loss Functions of CASIA Iris Generator Model')
+    plt.xlabel('Iterations')
+    plt.ylabel('Loss')
+
+    plt.savefig(os.path.join(log_dir, 'Loss.png'), bbox_inches='tight', dpi=600)
 
 if __name__ == '__main__':
     tf.app.run()

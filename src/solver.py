@@ -36,7 +36,7 @@ class Solver(object):
     def init_global_variables(self):
         self.sess.run(tf.global_variables_initializer())
         
-    def fixedSample(self, sample_dir, is_save=True, wsize=4, hsize=3):
+    def fixedSample(self, save_dir, is_save=True, wsize=4, hsize=3):
         feed = {
             self.model.z_vector_tfph: self.z_vectors,
             self.model.is_train_mode_tfph: False
@@ -65,7 +65,7 @@ class Solver(object):
                 ax.set_yticks([])
 
             # Save figure
-            plt.savefig(fname=os.path.join(sample_dir, 'fixed_' + str(self.epoch_time - 1).zfill(3) + '.png'),
+            plt.savefig(fname=os.path.join(save_dir, 'fixed_' + str(self.epoch_time - 1).zfill(3) + '.png'),
                         bbox_inches='tight')
             # Close figure
             plt.close(fig)
@@ -85,13 +85,13 @@ class Solver(object):
                 ax.set_yticks([])
 
             # Save figure
-            plt.savefig(fname=os.path.join(sample_dir, 'epoch_' + str(self.epoch_time - 1).zfill(3) + 'th' + '.png'),
+            plt.savefig(fname=os.path.join(save_dir, 'epoch_' + str(self.epoch_time - 1).zfill(3) + 'th' + '.png'),
                         bbox_inches='tight')
             # Close figure
             plt.close(fig)
 
 
-    def sample(self, idx, sample_dir, is_save=True, wsize=4, hsize=3):
+    def sample(self, idx, save_dir, is_save=True, wsize=4, hsize=3):
         feed = {
             self.model.is_train_mode_tfph: False
         }
@@ -120,9 +120,34 @@ class Solver(object):
                 ax.set_yticks([])
 
             # Save figure
-            plt.savefig(os.path.join(sample_dir, str(idx).zfill(7) + '.png'), bbox_inches='tight')
+            plt.savefig(os.path.join(save_dir, str(idx).zfill(7) + '.png'), bbox_inches='tight')
             # Close figure
             plt.close(fig)
+
+    def test_sample(self, idx, save_dir, wsize=4, hsize=3):
+        feed = {
+            self.model.is_train_mode_tfph: False
+        }
+
+        g_samples = self.sess.run(self.model.g_samples, feed_dict=feed)
+        g_samples = utils.unnormalizeUint8(g_samples)
+
+        # Create figure with sqrt(self.batch_size) x sqrt(self.batch_size) sub-plots
+        nrows = ncols = int(np.floor(np.sqrt(self.batch_size)))
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(wsize * ncols, hsize * nrows))
+        fig.subplots_adjust(hspace=0.03, wspace=0.03)
+
+        for i, ax in enumerate(axes.flat):
+            ax.imshow(g_samples[i], cmap='gray')
+
+            # Remove ticks from the plt
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+        # Save figure
+        plt.savefig(fname=os.path.join(save_dir, str(idx).zfill(3) + '.png'), bbox_inches='tight')
+        # Close figure
+        plt.close(fig)
 
 
     def train(self):
