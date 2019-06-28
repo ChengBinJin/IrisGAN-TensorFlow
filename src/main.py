@@ -25,6 +25,7 @@ from solver import Solver
 FLAGS = tf.flags.FLAGS
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_string('dataset', 'CASIA-Iris-Thousand', 'dataset name, default: CASIA-Iris-Thousand')
+tf.flags.DEFINE_string('method', 'wgan-gp', 'GAN method [dcgan|wgan-gp], default: WGAN-GP')
 tf.flags.DEFINE_integer('batch_size', 16, 'batch size for one iteration, default: 64')
 tf.flags.DEFINE_integer('z_dim', 100, 'dimension of the random vector, default: 100')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
@@ -59,15 +60,18 @@ def main(_):
     data = Dataset(name=FLAGS.dataset, is_train=FLAGS.is_train, resized_factor=0.25, log_dir=log_dir)
 
     # Initialize model
-    model = DCGAN(image_shape=data.image_shape,
-                  data_path=data(),
-                  batch_size=FLAGS.batch_size,
-                  z_dim=FLAGS.z_dim,
-                  lr=FLAGS.learning_rate,
-                  beta1=FLAGS.beta1,
-                  total_iters=int(np.ceil(FLAGS.epoch * data.num_images / FLAGS.batch_size)),
-                  is_train=FLAGS.is_train,
-                  log_dir=log_dir)
+    if FLAGS.method.lower() == 'wgan-gp':
+        model = WGAN_GP()
+    else:
+        model = DCGAN(image_shape=data.image_shape,
+                      data_path=data(),
+                      batch_size=FLAGS.batch_size,
+                      z_dim=FLAGS.z_dim,
+                      lr=FLAGS.learning_rate,
+                      beta1=FLAGS.beta1,
+                      total_iters=int(np.ceil(FLAGS.epoch * data.num_images / FLAGS.batch_size)),
+                      is_train=FLAGS.is_train,
+                      log_dir=log_dir)
 
     # Intialize solver
     solver = Solver(model=model,
@@ -169,9 +173,6 @@ def test(solver, saver, test_dir, model_dir, log_dir):
             print("Iter: {}".format(iter_time))
             solver.test_sample(idx=iter_time, save_dir=test_dir)
             iter_time += 1
-
-        # Close csv file
-        # csvWriter.close()
 
     except KeyboardInterrupt:
         coord.request_stop()

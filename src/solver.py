@@ -42,6 +42,8 @@ class Solver(object):
             self.model.is_train_mode_tfph: False
         }
 
+        print('mean: {}, std: {}'.format(np.mean(self.z_vectors), np.std(self.z_vectors)))
+
         g_samples = self.sess.run(self.model.g_samples, feed_dict=feed)
         self.epoch_time += 1
 

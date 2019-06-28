@@ -12,6 +12,46 @@ import utils as utils
 from reader import Reader
 
 
+class WGAN_GP(object):
+    def __init__(self, image_shape, data_path, batch_size=64, z_dim=100, lr=2e-4, beta1=0.999, total_iters=2e5,
+                 is_train=True, log_dir=None, name='wgan-gp'):
+        self.image_shape = image_shape
+        self.data_path = data_path
+        self.batch_size = batch_size
+        self.z_dim = z_dim
+        self.gen_dims = [4*5*512, 512, 256, 128, 64, 64, 3]
+        self.dis_dims = [64, 128, 256, 512, 512, 512, 1]
+        self.lr = lr
+        self.beta1 = beta1
+        self.total_steps = total_iters
+        self.start_decay_step = int(self.total_steps * 0.5)
+        self.decay_steps = self.total_steps - self.start_decay_step
+        self.is_train = is_train
+        self.log_dir = log_dir
+        self.name = name
+
+        self.g_lr_tb, self.d_lr_tb = None, None
+
+        self.logger = logging.getLogger(__name__)   #logger
+        self.logger.setLevel(logging.INFO)
+        utils.init_logger(logger=self.logger, log_dir=self.log_dir, is_train=self.is_train, name=self.name)
+        self.gen_ops, self.dis_ops = [], []
+
+        self._build_net()
+        self._initTensorBoard()
+        tf_utils.show_all_variables(logger=self.logger if self.is_train else None)
+
+    def _build_net(self):
+        print()
+
+    def _initTensorBoard(self):
+        dis_loss = tf.summary.scalar('Loss/dis_loss', self.dis_loss)
+        gen_loss = tf.summary.scalar('Loss/gen_loss', self.gen_loss)
+        dis_lr = tf.summary.scalar('Learning_rate/dis_lr', self.dis_optimizer_obj.learning_rate)
+        gen_lr = tf.summary.scalar('Learning_rate/gen_lr', self.gen_optimizer_obj.learning_rate)
+        self.summary_op = tf.summary.merge(inputs=[dis_loss, gen_loss, dis_lr, gen_lr])
+
+
 class DCGAN(object):
     def __init__(self, image_shape, data_path, batch_size=64, z_dim=100, lr=2e-4, beta1=0.999, total_iters=2e5,
                  is_train=True, log_dir=None, name='dcgan'):
@@ -39,8 +79,6 @@ class DCGAN(object):
 
         self._build_net()
         self._initTensorBoard()
-
-        # self._tensorboard()
         tf_utils.show_all_variables(logger=self.logger if self.is_train else None)
 
     def _build_net(self):
@@ -223,6 +261,11 @@ class Discriminator(object):
             self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
             return output
+
+
+class ResnetGenerator(object):
+    def __init__(self):
+
 
 class Generator(object):
     def __init__(self, name, dims, norm='batch', _ops=None, logger=None):

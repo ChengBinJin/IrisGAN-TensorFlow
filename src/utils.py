@@ -79,6 +79,7 @@ def print_main_parameters(logger, flags, is_train=True):
     if is_train:
         logger.info('gpu_index: \t\t{}'.format(flags.gpu_index))
         logger.info('dataset: \t\t{}'.format(flags.dataset))
+        logger.info('method: \t\t{}'.format(flags.method))
         logger.info('batch_size: \t\t{}'.format(flags.batch_size))
         logger.info('z_dim: \t\t{}'.format(flags.z_dim))
         logger.info('is_train: \t\t{}'.format(flags.is_train))
@@ -92,6 +93,7 @@ def print_main_parameters(logger, flags, is_train=True):
     else:
         print('-- gpu_index: \t\t{}'.format(flags.gpu_index))
         print('-- dataset: \t\t{}'.format(flags.dataset))
+        print('-- method: \t\t{}'.format(flags.method))
         print('-- batch_size: \t\t{}'.format(flags.batch_size))
         print('-- z_dim: \t\t{}'.format(flags.z_dim))
         print('-- is_train: \t\t{}'.format(flags.is_train))
