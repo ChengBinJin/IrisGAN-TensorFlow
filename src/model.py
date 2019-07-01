@@ -19,7 +19,7 @@ class WGAN_GP(object):
         self.data_path = data_path
         self.batch_size = batch_size
         self.z_dim = z_dim
-        self.gen_dims = [4*5*512, 512, 256, 128, 64, 64, 3]
+        self.gen_dims = [512, 512, 256, 128, 64, 64, 3]
         self.dis_dims = [64, 128, 256, 512, 512, 512, 1]
         self.lr = lr
         self.beta1 = beta1
@@ -204,6 +204,12 @@ class Optimizer(object):
 
         return learn_step
 
+
+class ResnetDiscriminator(object):
+    def __init__(self, name, dims, norm='batch', _ops=None, logger=None):
+        self.name = name
+
+
 class Discriminator(object):
     def __init__(self, name, dims, norm='batch', _ops=None, logger=None):
         self.name = name
@@ -264,7 +270,68 @@ class Discriminator(object):
 
 
 class ResnetGenerator(object):
-    def __init__(self):
+    def __init__(self, name, dims, norm='batch', _ops=None, logger=None):
+        self.name = name
+        self.dims = dims
+        self.norm = norm
+        self._ops = _ops
+        self.logger = logger
+        self.reuse = False
+
+    def __call__(self, x, is_train=True):
+        with tf.variable_scope(self.name, reuse=self.reuse):
+            tf_utils.print_activations(x)
+
+            # (N, 100) -> (N, 4, 5, 512)
+            h0_linear = tf_utils.linear(x, 4*5*self.dims[0], name='h0_linear', initializer='He',
+                                        logger=self.logger if is_train is True else None)
+            h0_reshape = tf.reshape(h0_linear, [tf.shape(h0_linear)[0], 4, 5, self.dims[0]])
+
+            # (N, 4, 5, 512) -> (N, 8, 10, 512)
+            resblock_1 = tf_utils.res_block_v2(x=h0_reshape, k=self.dims[1], filter_size=3, _ops=self._ops,
+                                               norm_='batch', resample='up', name='res_block_1',
+                                               logger=self.logger if is_train is True else None)
+
+            # (N, 8, 10, 512) -> (N, 16, 20, 256)
+            resblock_2 = tf_utils.res_block_v2(x=resblock_1, k=self.dims[2], filter_size=3, _ops=self._ops,
+                                               norm_='batch', resample='up', name='res_block_2',
+                                               logger=self.logger if is_train is True else None)
+
+            # (N, 16, 20, 256) -> (N, 15, 20, 256)
+            resblock_2_split, _ = tf.split(resblock_2, [15, 1], axis=1, name='resblock_2_split')
+            tf_utils.print_activations(resblock_2_split, logger=self.logger if is_train is True else None)
+
+            # (N, 15, 20, 256) -> (N, 30, 40, 128)
+            resblock_3 = tf_utils.res_block_v2(x=resblock_2_split, k=self.dims[3], filter_size=3, _ops=self._ops,
+                                               norm_='batch', resample='up', name='res_block_3',
+                                               logger=self.logger if is_train is True else None)
+
+            # (N, 30, 40, 128) -> (N, 60, 80, 64)
+            resblock_4 = tf_utils.res_block_v2(x=resblock_3, k=self.dims[4], filter_size=3, _ops=self._ops,
+                                               norm_='batch', resample='up', name='res_block_4',
+                                               logger=self.logger if is_train is True else None)
+
+            # (N, 60, 80, 64) -> (N, 120, 160, 64)
+            resblock_5 = tf_utils.res_block_v2(x=resblock_4, k=self.dims[5], filter_size=3, _ops=self._ops,
+                                               norm_='batch', resample='up', name='res_block_5',
+                                               logger=self.logger if is_train is True else None)
+
+            norm_5 = tf_utils.norm(resblock_5, name='norm_5', _type='batch', _ops=self._ops, is_train=is_train,
+                                   logger=self.logger if is_train is True else None)
+
+            relu_5 = tf_utils.relu(norm_5, name='relu_5', logger=self.logger if is_train is True else None)
+
+            # (N, 120, 160, 64) -> (N, 120, 160, 3)
+            conv_6 = tf_utils.conv2d(relu_5, output_dim=self.dims[6], k_h=3, k_w=3, d_h=1, d_w=1, name='conv_6',
+                                     logger=self.logger if is_train is True else None)
+
+            output = tf_utils.tanh(conv_6, name='output', logger=self.logger if is_train is True else None)
+
+        # Set reuse=True for next call
+        self.reuse = True
+        self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
+
+        return output
 
 
 class Generator(object):

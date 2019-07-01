@@ -4,6 +4,7 @@
 # Written by Cheng-Bin Jin
 # Email: sbkim0407@gmail.com
 # ---------------------------------------------------------
+import functools
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.training import moving_averages
@@ -242,6 +243,63 @@ def res_block(x, k, _ops=None, norm_='instance', is_train=True, pad_type=None, n
     return output
 
 
+def res_block_v2(x, k, filter_size, _ops=None, norm_='instance', is_train=True, resample=None, name=None,
+                 is_print=True, logger=None):
+    with tf.variable_scope(name):
+        if resample == 'down':
+            conv_shortcut = functools.partial(avgPoolConv, output_dim=k, filter_size=1)
+            conv_1 = functools.partial(conv2d, output_dim=k, k_h=filter_size, k_w=filter_size, d_h=1, d_w=1)
+            conv_2 = functools.partial(convAvgPool, output_dim=k)
+        elif resample == 'up':
+            conv_shortcut = functools.partial(deconv2d, k=k)
+            conv_1 = functools.partial(deconv2d, k=k, k_h=filter_size, k_w=filter_size)
+            conv_2 = functools.partial(conv2d, output_dim=k, k_h=filter_size, k_w=filter_size, d_h=1, d_w=1)
+        elif resample is None:
+            conv_shortcut = functools.partial(conv2d, output_dim=k, k_h=filter_size, k_w=filter_size, d_h=1, d_w=1)
+            conv_1 = functools.partial(conv2d, output_dim=k, k_h=filter_size, k_w=filter_size, d_h=1, d_w=1)
+            conv_2 = functools.partial(conv2d, output_dim=k, k_h=filter_size, k_w=filter_size, d_h=1, d_w=1)
+        else:
+            raise Exception('invalid resample value')
+
+        if (k == x.get_shape().as_list()[3]) and (resample is None):
+            shortcut = x  # Identity skip-connection
+        else:
+            shortcut = conv_shortcut(x, name='shortcut')
+
+        output = x
+        output = norm(output, _type=norm_, _ops=_ops, is_train=is_train, name='norm1', is_print=is_print, logger=logger)
+        output = relu(output, name='relu1', is_print=is_print, logger=logger)
+        output = conv_1(output, name='conv1', is_print=is_print, logger=logger)
+        output = norm(output, _type=norm_, _ops=_ops, is_train=is_train, name='norm2', is_print=is_print, logger=logger)
+        output = relu(output, name='relu2', is_print=is_print, logger=logger)
+        output = conv_2(output, name='conv2', is_print=is_print, logger=logger)
+
+        return shortcut + output
+
+
+def convAvgPool(x, output_dim, filter_size=3, stride=1, name='convAvgPool', is_print=True, logger=None):
+    with tf.variable_scope(name):
+        output = conv2d(x, output_dim=output_dim, k_h=filter_size, k_w=filter_size, d_h=stride, d_w=stride,
+                        is_print=is_print, logger=logger)
+        output = avg_pool(output, name='avg_pool', is_print=is_print, logger=logger)
+
+        if is_print:
+            print_activations(output, logger)
+
+        return output
+
+
+def avgPoolConv(x, output_dim, filter_size=3, stride=1, name='avgPoolConv', is_print=True, logger=None):
+    with tf.variable_scope(name):
+        output = avg_pool(x, name='avg_pool', is_print=is_print, logger=logger)
+        output = conv2d(output, output_dim=output_dim, k_h=filter_size, k_w=filter_size, d_h=stride, d_w=stride,
+                        is_print=True, logger=logger)
+        if is_print:
+            print_activations(output, logger)
+
+        return output
+
+
 def identity(x, name='identity', is_print=True, logger=None):
     output = tf.identity(x, name=name)
     if is_print:
@@ -254,7 +312,17 @@ def max_pool(x, name='max_pool', ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], is_pr
     output = tf.nn.max_pool(value=x, ksize=ksize, strides=strides, padding='SAME', name=name)
     if is_print:
         print_activations(output, logger)
+
     return output
+
+
+def avg_pool(x, name='avg_pool', ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], is_print=True, logger=None):
+    output = tf.nn.avg_pool(value=x, ksize=ksize, strides=strides, padding='SAME', name=name)
+    if is_print:
+        print_activations(output, logger)
+
+    return output
+
 
 def dropout(x, keep_prob=0.5, seed=None, name='dropout', is_print=True, logger=None):
     try:
